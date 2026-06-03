@@ -1,0 +1,80 @@
+-ENGLISH-
+
+Timbears
+--------
+Gameplay Modes
+--------------
+Pressing the button on joystick 1 takes you to
+1/2 - Single Player Mode
+Players can play independently by starting their own
+game by pressing the button on their own joystick
+
+VS - Competition Mode
+Starts by pressing the fire button on joystick 2
+
+-----------------------------------------------------------
+1/2 - Single Player Mode Rules
+The aim is to reach 900 pieces of cut tree trunks.
+The game ends if the player is hit by a branch or if the
+time bar reaches zero.
+The time drains faster when the right difficulty switch
+is set to B.
+
+VS Mode Rules
+The first player to cut 100 or 200 of tree trunks wins.
+If hit by a branch, the player is stunned for 1 second
+and the time bar is fully restored.
+The player is eliminated if the time bar reaches zero.
+
+-----------------------------------------------------------
+The difficulty switches must be set on the main screen.
+-----------------------------------------------------------
+Left Difficulty Switch (VS Mode only)
+A - aim: 200 pieces of cut tree trunks
+B - aim: 100 pieces of cut tree trunks
+
+Right Difficulty Switch (VS Mode and Single Player)
+A - the tree is always full of branches
+B - some branches may randomly be missing
+----------------------------------------------------------------------------------------------
+
+-ITALIANO-
+
+Timbears
+--------
+Modalità di Gioco
+-----------------
+Premendo il pulsante sul joystick 1 accedi a:
+1/2 - Modalità Giocatore Singolo
+I giocatori possono giocare in modo indipendente avviando
+la propria partita premendo il pulsante sul proprio joystick.
+
+VS - Modalità Competitiva
+Si avvia premendo il pulsante di fuoco sul joystick 2.
+
+-----------------------------------------------------------
+
+1/2 - Regole Modalità Giocatore Singolo
+L'obiettivo è raggiungere 900 pezzi di tronchi tagliati.
+La partita termina se il giocatore viene colpito da un ramo o
+se la barra del tempo arriva a zero.
+Il tempo si consuma più velocemente quando l'interruttore
+di difficoltà destro è impostato su B.
+
+VS - Regole Modalità Competitiva
+Il primo giocatore a tagliare 100 o 200 tronchi vince.
+Se colpito da un ramo, il giocatore rimane stordito per 1 secondo
+e la barra del tempo viene completamente ripristinata.
+Il giocatore viene eliminato se la barra del tempo arriva a zero.
+
+----------------------------------------------------------------------------------
+Gli interruttori di difficoltà devono essere impostati nella schermata principale.
+----------------------------------------------------------------------------------
+Interruttore di Difficoltà Sinistro (solo Modalità VS)
+A — obiettivo: 200 pezzi di tronchi tagliati
+B — obiettivo: 100 pezzi di tronchi tagliati
+
+Interruttore di Difficoltà Destro (Modalità VS e Giocatore Singolo)
+A — l'albero è sempre pieno di rami
+B — alcuni rami possono mancare casualmente
+
