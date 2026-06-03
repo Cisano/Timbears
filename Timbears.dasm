@@ -1,0 +1,2118 @@
+;Copyright 2026 Cisano Carmelo
+;
+;This file is part of TimBears
+;
+;    TimBears is free software: you can redistribute it and/or modify
+;    it under the terms of the GNU General Public License as published by
+;    the Free Software Foundation, either version 3 of the License, or
+;    (at your option) any later version.
+;
+;    TimBears is distributed in the hope that it will be useful,
+;    but WITHOUT ANY WARRANTY; without even the implied warranty of
+;    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+;    GNU General Public License for more details.
+;
+;    You should have received a copy of the GNU General Public License
+;    along with TimBears.  If not, see <http://www.gnu.org/licenses/>.
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	processor 6502
+	include "vcs.h"
+	include "macro.h"
+    include "my_macro.h"
+    include "joystick_macro.h"
+
+NTSC = 1 ; PAL = 0
+
+	IF NTSC
+;NTSC COLORS
+BLACK = $00
+WHITE = $0E
+RED = $40
+YELLOW = $1E
+BLUE_SKY = $92
+LIGHT_BLUE_SKY = $94
+GREEN = $C0
+DARK_GREEN = $D0
+GREEN_GROUND = $D2
+COLOR_LOGO_ON = $FE
+VERY_LIGHT_BROWN = $FE
+;BEARS COLORS
+BROWN_ONE = $F4
+BROWN_TWO = $FA
+BROWN_THREE = $FE
+PINK_ONE = $54
+PINK_TWO = $5A
+PINK_THREE = $5E
+
+	ELSE
+;PAL COLORS
+BLACK = $00
+WHITE = $0E
+RED = $62
+YELLOW = $2E
+BLUE_SKY = $B4
+LIGHT_BLUE_SKY = $B6
+GREEN = $52
+DARK_GREEN = $50
+GREEN_GROUND = $72
+COLOR_LOGO_ON = $2A
+VERY_LIGHT_BROWN = $2A
+;BEARS COLORS
+BROWN_ONE = $24
+BROWN_TWO = $28
+BROWN_THREE = $2C
+PINK_ONE = $84
+PINK_TWO = $8A
+PINK_THREE = $8E
+	ENDIF
+
+TRUE = #%11111111
+FALSE = #%00000000
+
+MASK_TITLE_SCEEN = #%00000001
+;keep game option and set 1 copy after countdown
+MASK_CHECK_SHOW_HIDE_CUPS = #%01000000
+MASK_GAME_VS = #%01000000 ;Sset bit7=1 VS player | bit6=0 hides cups
+MASK_GAME_1_2 = #%00000000 ;set bit7=0 1/2 player | bit6=0 hides cups
+FULL_SIZE_TRUNK = #03
+
+START_GAME = #%01000000
+DIM_SCREEN = #163
+BEGINSCREEN = #3
+POSITION_SCORE = #40
+POSITION_BAR_P0 = #43
+POSITION_BAR_P1 = #107
+FULL_BAR = #%11111110 ;254
+POSITION_LEFT_P0 = #33
+POSITION_RIGHT_P0 = #61
+POSITION_LEFT_P1 = #97
+POSITION_RIGHT_P1 = #125
+POSITION_SINGLE_PL = #68;52
+POSITION_VS = #91;75
+POSITION_LEFT_CUP = #48
+POSITION_RIGHT_CUP = #112
+
+DIM_ARRAY_BRANCHES = #6; 0...6=7 elements
+TRUNK = #$03 ;size in pixel of half trunk
+
+LEFT_SWITCH_A_VS_MODE = #2 ;mean 200 to get the cup - checking first part of decimal mode score
+LEFT_SWITCH_B_VS_MODE = #1 ;mean 100 to get the cup - checking first part of decimal mode score
+GOAL_SINGLE_PLAYER = #9 ;complete the game - means 900 checking first part of decimal mode score
+
+BLOCK_OPTION = #0
+BLOCK_COUNTDOWN = #1
+
+SPEED_ENEGRY_LOST_VS = #16
+SPEED_ENEGRY_LOST_1_2_A = #10
+SPEED_ENEGRY_LOST_1_2_B = #12
+
+SFX_PISTOL_BEAR_LEFT = #0
+SFX_PISTOL_BEAR_RIGHT = #1
+SFX_BEEP = #2
+SFX_VICTORY_BEAR0 = #3
+SFX_VICTORY_BEAR1 = #4
+SFX_GAMEOVER_P0 = #5
+SFX_GAMEOVER_P1 = #6
+SFX_CX_BRANCH_PP = #7
+
+COUNTDOWN_VALUE = #200
+FRAMES_BEFORE_TRUNK_FALL_DOWN = #4
+TIME_TO_WAIT_FOR_COLLISION = #60
+TIME_TO_WAIT_AT_GOAL_ACHIEVED = #250
+TIME_TO_WAIT_COME_BACK_OPTIONS = #250
+TIME_TO_WAIT_BARTIME_ZERO = #150
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	SEG.U VARS
+	ORG $80
+;;;;;;;;;;;;;;; RAM ;;;;;;;;;;;;;;;;
+ArraySideLeftTreeOne ds 7
+ArraySideRightTreeOne ds 7
+ArraySideLeftTreeTwo ds 7
+ArraySideRightTreeTwo ds 7
+CursorArrayBranches ds 1
+CutSectionOfTrunkOne ds 1
+CutSectionOfTrunkTwo ds 1
+
+;score needs 2 parts in decimal mode
+ScorePt1P0 ds 1 
+ScorePt1P1 ds 1
+ScorePt2P0 ds 1
+ScorePt2P1 ds 1
+
+BarTimeP0 ds 1
+BarTimeP1 ds 1
+
+TimerForAll ds 1
+IndexForRandom ds 1
+TimerForCountDownP0 ds 1
+TimerForCountDownP1 ds 1
+TimerFreezeP0 ds 1
+TimerFreezeP1 ds 1
+TimerEnergyBarP0 ds 1
+TimerEnergyBarP1 ds 1
+TimerComeBackOptions ds 1
+
+ReflectP0 ds 1
+ReflectP1 ds 1
+
+GameOver_P0 ds 1
+GameOver_P1 ds 1
+
+CoordXBearP0 ds 1
+CoordXBearP1 ds 1
+CoordXCloudOne ds 1
+CoordXCloudTwo ds 1
+CoordXCloudThree ds 1
+CoordXCloudFour ds 1
+
+IdSprites ds 1 ;increase it for get the all sprites from the table
+
+BooleanJoy0 ds 1
+BooleanJoy1 ds 1
+BooleanFire0 ds 1
+BooleanFire1 ds 1
+BooleanTVFormat ds 1
+
+Pointer_One_Low ds 1
+Pointer_One_Hi ds 1
+Pointer_Two_Low ds 1
+Pointer_Two_Hi ds 1
+Pointer_Three_Low ds 1
+Pointer_Three_Hi ds 1
+
+Pointer_Four_Low ds 1
+Pointer_Four_Hi ds 1
+Pointer_Five_Low ds 1
+Pointer_Five_Hi ds 1
+Pointer_Six_Low ds 1
+Pointer_Six_Hi ds 1
+
+Pointer_Switch_Left_Low ds 1
+Pointer_Switch_Left_Hi ds 1
+Pointer_Switch_Right_Low ds 1
+Pointer_Switch_Right_Hi ds 1
+
+Temp ds 1
+Tmp ds 1
+
+;TRUE = show - FALSE = hide
+;trigger for victory song / gameover jingle
+;#%01111111 already playing or played
+ShowHideCupsP0 ds 1
+ShowHideCupsP1 ds 1
+PlayGameOverP0 ds 1
+PlayGameOverP1 ds 1
+
+GameOption ds 1 ;FALSE=single player - TRUE=VS game
+
+IdSfxP0 ds 1
+IdSfxP1 ds 1
+TempoCH0 ds 1
+TempoCH1 ds 1
+CursorSound0 ds 1
+CursorSound1 ds 1
+SoundDataLow0 ds 1
+SoundDataHi0 ds 1
+SoundDataLow1 ds 1
+SoundDataHi1 ds 1
+WhichBlockShow ds 1
+
+;bit7=0 start count frames for cutted trunk
+;bit7=1 no count
+TriggerCountFrameTrunkOne ds 1
+TriggerCountFrameTrunkTwo ds 1
+
+Goal ds 1
+SpeedEnergyLost ds 1
+ShowTitleScreen ds 1
+
+LeftBranch ds 4
+RightBranch ds 4
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    SEG CODE
+	org $f000
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;SUBROUTINE
+roundPosition
+    sec
+	sta WSYNC
+	bit 0
+.DivideLoop
+	sbc #15
+	bcs .DivideLoop
+	eor #7
+	asl
+	asl
+	asl
+	asl
+	sta RESP0,y ;fix course position
+    ;
+	sta WSYNC
+	sta HMP0,y
+	rts
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;nuumbers
+Number0
+	.byte $E7 ; |XXX  XXX|
+	.byte $A5 ; |X X  X X|
+	.byte $A5 ; |X X  X X|
+	.byte $A5 ; |X X  X X|
+	.byte $A5 ; |X X  X X|
+	.byte $A5 ; |X X  X X|
+	.byte $E7 ; |XXX  XXX|
+Number1
+	.byte $E7 ; |XXX  XXX|
+	.byte $42 ; | X    X |
+	.byte $42 ; | X    X |
+	.byte $42 ; | X    X |
+	.byte $42 ; | X    X |
+	.byte $C6 ; |XX   XX |
+	.byte $42 ; | X    X |
+Number2
+	.byte $E7 ; |XXX  XXX|
+	.byte $84 ; |X    X  |
+	.byte $84 ; |X    X  |
+	.byte $E7 ; |XXX  XXX|
+	.byte $21 ; |  X    X|
+	.byte $21 ; |  X    X|
+	.byte $E7 ; |XXX  XXX|
+Number3
+	.byte $E7 ; |XXX  XXX|
+	.byte $21 ; |  X    X|
+	.byte $21 ; |  X    X|
+	.byte $E7 ; |XXX  XXX|
+	.byte $21 ; |  X    X|
+	.byte $21 ; |  X    X|
+	.byte $E7 ; |XXX  XXX|
+Number4
+	.byte $21 ; |  X    X|
+	.byte $21 ; |  X    X|
+	.byte $21 ; |  X    X|
+	.byte $E7 ; |XXX  XXX|
+	.byte $A5 ; |X X  X X|
+	.byte $84 ; |X    X  |
+	.byte $84 ; |X    X  |
+Number5
+	.byte $E7 ; |XXX  XXX|
+	.byte $21 ; |  X    X|
+	.byte $21 ; |  X    X|
+	.byte $E7 ; |XXX  XXX|
+	.byte $84 ; |X    X  |
+	.byte $84 ; |X    X  |
+	.byte $E7 ; |XXX  XXX|
+Number6
+	.byte $E7 ; |XXX  XXX|
+	.byte $A5 ; |X X  X X|
+	.byte $A5 ; |X X  X X|
+	.byte $E7 ; |XXX  XXX|
+	.byte $84 ; |X    X  |
+	.byte $84 ; |X    X  |
+	.byte $E7 ; |XXX  XXX|
+Number7
+	.byte $21 ; |  X    X|
+	.byte $21 ; |  X    X|
+	.byte $21 ; |  X    X|
+	.byte $21 ; |  X    X|
+	.byte $21 ; |  X    X|
+	.byte $21 ; |  X    X|
+	.byte $E7 ; |XXX  XXX|
+Number8
+	.byte $E7 ; |XXX  XXX|
+	.byte $A5 ; |X X  X X|
+	.byte $A5 ; |X X  X X|
+	.byte $E7 ; |XXX  XXX|
+	.byte $A5 ; |X X  X X|
+	.byte $A5 ; |X X  X X|
+	.byte $E7 ; |XXX  XXX|
+Number9
+	.byte $E7 ; |XXX  XXX|
+	.byte $21 ; |  X    X|
+	.byte $21 ; |  X    X|
+	.byte $E7 ; |XXX  XXX|
+	.byte $A5 ; |X X  X X|
+	.byte $A5 ; |X X  X X|
+	.byte $E7 ; |XXX  XXX|
+
+BearOne
+	.byte $E7 ; |XXX  XXX|
+	.byte $E7 ; |XXX  XXX|
+	.byte $66 ; | XX  XX |
+	.byte $66 ; | XX  XX |
+	.byte $7E ; | XXXXXX |
+	.byte $3C ; |  XXXX  |
+	.byte $3C ; |  XXXX  |
+	.byte $3F ; |  XXXXXX|
+	.byte $63 ; | XX   XX|
+	.byte $F0 ; |XXXX    |
+	.byte $F0 ; |XXXX    |
+	.byte $F8 ; |XXXXX   |
+	.byte $40 ; | X      |
+	.byte $3f ; |  XXXXXX|
+	.byte $18 ; |   XX   |
+	.byte $34 ; |  XX X  |
+	.byte $7E ; | XXXXXX |
+	.byte $66 ; | XX  XX |
+	.byte $42 ; | X    X |
+	.byte $5A ; | X XX X |
+	.byte $7E ; | XXXXXX |
+	.byte $BD ; |X XXXX X|
+	.byte $A5 ; |X X  X X|
+	.byte $42 ; | X    X |
+
+ColorBearOne
+    .byte #BROWN_ONE;
+    .byte #BROWN_ONE;
+    .byte #BROWN_TWO;
+    .byte #BROWN_TWO;
+    .byte #BROWN_TWO;
+    .byte #BROWN_TWO;
+    .byte #BROWN_TWO;
+    .byte #BROWN_TWO;
+    .byte #BROWN_TWO;
+    .byte #BROWN_TWO;
+    .byte #BROWN_TWO;
+    .byte #BROWN_TWO;
+    .byte #BROWN_TWO;
+    .byte #BROWN_TWO;
+    .byte #BROWN_TWO;
+    .byte #BROWN_THREE;
+    .byte #BROWN_THREE;
+    .byte #BROWN_THREE;
+    .byte #BROWN_THREE;
+    .byte #BROWN_TWO;
+    .byte #BROWN_TWO;
+    .byte #BROWN_TWO;
+    .byte #BROWN_TWO;
+    .byte #BROWN_TWO;
+ColorBearTwo
+    .byte #PINK_ONE;
+    .byte #PINK_ONE;
+    .byte #PINK_TWO;
+    .byte #PINK_TWO;
+    .byte #PINK_TWO;
+    .byte #PINK_TWO;
+    .byte #PINK_TWO;
+    .byte #PINK_TWO;
+    .byte #PINK_TWO;
+    .byte #PINK_TWO;
+    .byte #PINK_TWO;
+    .byte #PINK_TWO;
+    .byte #PINK_TWO;
+    .byte #PINK_TWO;
+    .byte #PINK_TWO;
+    .byte #PINK_THREE;
+    .byte #PINK_THREE;
+    .byte #PINK_THREE;
+    .byte #PINK_THREE;
+    .byte #PINK_TWO;
+    .byte #PINK_TWO;
+    .byte #PINK_TWO;
+    .byte #PINK_TWO;
+    .byte #PINK_TWO;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+TableSpiteLow
+	.byte <LeftCloud, <RightCloud, <LeftDownCloud, <RightDownCloud, <Bush, <Bush, <BarTimeP0, <BarTimeP1
+	.byte <SinglePlayer, <Versus
+TableSpriteHi
+	.byte >LeftCloud, >RightCloud, >LeftDownCloud, >RightDownCloud, >Bush, >Bush, >BarTimeP0, >BarTimeP1
+	.byte >SinglePlayer, >Versus
+TableSwitchesLow
+	.byte <OneHundred, <TwoHundred, <SomeBranches, <AllBranches 
+TableSwitchesHi
+	.byte >OneHundred, >TwoHundred, >SomeBranches, >AllBranches 
+TableNumbersLow
+	.byte <Number0, <Number1, <Number2, <Number3, <Number4, <Number5, <Number6, <Number7, <Number8, <Number9
+TableNumbersHi
+	.byte >Number0, >Number1, >Number2, >Number3, >Number4, >Number5, >Number6, >Number7, >Number8, >Number9
+TableNumCountDownLow
+	.byte <Cup, <One, <Two, <Three
+TableNumCountDownHi
+	.byte >Cup, >One, >Two, >Three
+TableSfxLow
+	.byte <GunLeftBear, <GunRightBear, <CountDownSfx, <VictorySongBear0, <VictorySongBear1, <SfxGameOverP0, <SfxGameOverP1
+	.byte <SfxCxBranchPP
+TableSfxHi
+	.byte >GunLeftBear, >GunRightBear, >CountDownSfx, >VictorySongBear0, >VictorySongBear1, >SfxGameOverP0, >SfxGameOverP1
+	.byte >SfxCxBranchPP
+TableConstForSong
+	.byte SFX_VICTORY_BEAR0, SFX_VICTORY_BEAR1
+TableConstForSFX
+	.byte SFX_GAMEOVER_P0, SFX_GAMEOVER_P1
+
+;first 2 bytes can be a left branch
+;last 2 bytes can be a right branch
+;with possible empty branches
+;====|      |
+;    |      |
+;    |      |====
+TableAmateurLeftBranch
+	.byte $03, $0f, $03, $03
+TableAmateurRightBranch
+	.byte $03, $03, $0f, $03
+
+;A lot of branches
+;first 2 bytes can be a left branch
+;last 2 bytes can be a right branch
+;with always a branch
+;====|      |
+;    |      |====
+;    |      |====
+TableProLeftBranch
+	.byte $0f, $0f, $03, $03
+TableProRightBranch
+	.byte $03, $03, $0f, $0f
+;*******************************************************
+;*******************************************************
+Start
+	CLEAN_START
+;*****SET COLOR AND BORDER WITH PF0****
+	lda #BLACK ;color of the trees
+	sta COLUPF
+	lda #$30
+	sta PF0
+;*****SET CLOUDS COORDS*****************
+	lda #50
+	sta CoordXCloudOne
+	lda #58
+	sta CoordXCloudTwo
+	lda #70
+	sta CoordXCloudThree
+	lda #86
+	sta CoordXCloudFour
+;***************************************
+	jsr initVariables
+	jsr initVarsBeginGameP0
+    jsr initVarsBeginGameP1
+	lda #TRUE
+	sta GameOver_P0
+	sta GameOver_P1
+;***************************************
+NextFrame
+	VERTICAL_SYNC
+verifyReset
+	lsr SWCHB ;test Game Reset switch
+	bcs setTimer ;reset?
+	jmp Start
+setTimer
+    lda #44 ;37 lines x 76 cycles per lines = 2812 cycles / 64 = 43
+    sta TIM64T
+;****************************************
+;DIFFICULTY SHITCHES*********************
+;CHANGE COLORS OF BACKGROUND FOR FEEDBACK
+	lda WhichBlockShow ;only in Options can be setted
+	bne exitRightSwitch
+;LEFT
+	ldy #0 ;One Hundred
+	ldx #LEFT_SWITCH_B_VS_MODE ;1 means 100
+	lda #%01000000
+	bit SWCHB
+	beq storeDifficult
+	ldy #1 ;Two Hundred
+	ldx #LEFT_SWITCH_A_VS_MODE ;2 means 200
+storeDifficult
+	lda TableSwitchesLow,y
+	sta Pointer_Switch_Left_Low
+	lda TableSwitchesHi,y
+	sta Pointer_Switch_Left_Hi
+	stx Goal
+	;SpeedEnergyLost set when press fire in macro SELECT_OPTION_GAME
+exitLeftSwitch
+;RIGHT
+	lda #%10000000
+	bit SWCHB
+	bne preSetBranchPro
+	ldy #2 ;some branches
+	ldx #3
+setBranchAmateur
+	lda TableAmateurLeftBranch,x
+	sta LeftBranch,x
+	lda TableAmateurRightBranch,x
+	sta RightBranch,x
+	dex
+	bpl setBranchAmateur
+	lda #SPEED_ENEGRY_LOST_1_2_A
+	sta SpeedEnergyLost
+	jmp preExitRightSwitch
+preSetBranchPro
+	ldy #3 ;full of branches
+	ldx #3
+setBranchePro
+	lda TableProLeftBranch,x
+	sta LeftBranch,x
+	lda TableProRightBranch,x
+	sta RightBranch,x
+	dex
+	bpl setBranchePro
+	lda #SPEED_ENEGRY_LOST_1_2_B
+	sta SpeedEnergyLost
+	;Goal set when press fire in macro SELECT_OPTION_GAME
+preExitRightSwitch
+	lda TableSwitchesLow,y
+	sta Pointer_Switch_Right_Low
+	lda TableSwitchesHi,y
+	sta Pointer_Switch_Right_Hi
+exitRightSwitch
+;****************************************
+;****************************************
+setTimers
+	;TimerForAll takes 4 seconds in 60hz to arrives at 0
+	inc TimerForAll ;must always run
+	inc IndexForRandom
+	lda IndexForRandom
+	cmp #120 ;last byte ram before many zeros
+	bmi amongTheRam
+	lda #0
+	sta IndexForRandom
+amongTheRam
+;*******UPDATE CLOUDS********************
+;clouds up
+	ldx #1
+	ldy #1
+	lda TimerForAll
+	and #%00111111 ;move clouds every...
+	jsr updateClouds
+;clouds down
+	ldx #3
+	ldy #1
+	lda TimerForAll
+	and #%01111111 ;move clouds every...
+	jsr updateClouds
+;endUpdateDownClound
+;*******END UPDATE CLOUDS*************
+;*************************************
+;*************************************
+;CHECK BARTIME
+;IF BARTIME=0 THEN GAME OVER
+;REST POSITION M0 AND BALL
+;JOY STOP TO WORK
+	lda #TIME_TO_WAIT_BARTIME_ZERO
+	sta Tmp
+	ldx #1
+checkBarPP
+	lda BarTimeP0,x
+	bne exitCheckBarPP ;if zero
+	sta BooleanJoy0,x ;reset position M0
+	lda #%00001111 ;half #TRUE used to store the value
+	ora GameOver_P0,x
+	sta GameOver_P0,x ;joy stop to work
+;parameters x=Px | Tmp=TIME_TO_WAIT_BARTIME_ZERO	
+	jsr tryToFreeze
+exitCheckBarPP
+	dex
+	bpl checkBarPP
+;*************************************
+;*************************************
+;CHECK BOTH BARS ARE ZERO
+;START TIMER TO COME BACK TO OPTIONS
+;ONLY VS MODE NEEDS IT
+	lda GameOption ;check if VS mode
+	beq exitCheckBothBarTime
+	lda WhichBlockShow ;check current block
+	beq exitCheckBothBarTime ;if OPTIONS BLOCK then jump
+checkBothBarTime
+	lda BarTimeP0
+	ora BarTimeP1
+	bne exitCheckBothBarTime ;check if both are at zero
+;both timer at zero, start timer to come back
+	inc TimerComeBackOptions
+	lda TimerComeBackOptions
+	cmp #TIME_TO_WAIT_COME_BACK_OPTIONS ;check if timer has completed
+	bne exitCheckBothBarTime
+	lda #BLOCK_OPTION ;after timer complete, show OPTIONS BLOCK
+	sta WhichBlockShow
+exitCheckBothBarTime
+;*************************************
+;*************************************
+;CHECK ONE PLAYER WINS IN VS MODE
+;BOTH ARE STOPPED
+;FREEZE PLAYERS
+;START TIMER TO COME BACK TO OPTIONS
+;RESET POSITION M0 AND BALL
+;JOY STOP TO WORK
+	lda GameOption ;check if VS mode
+	beq exitFreezeForGameOver
+	lda WhichBlockShow ;check current block
+	beq exitFreezeForGameOver ;if BLOCK OPTIONS then jump
+freezeForGameOver
+	lda ScorePt1P0
+	cmp Goal ;check if goal achieved P0
+	beq freezeBeforeGameOver
+	lda ScorePt1P1
+	cmp Goal ;check if goal achieved P1
+	bne exitFreezeForGameOver
+freezeBeforeGameOver
+	lda #FALSE
+	sta BooleanJoy0 ;reset position M0
+	sta BooleanJoy1 ;reset position BALL
+	lda #TRUE ;stop BOTH joys to work
+	sta GameOver_P0
+	sta GameOver_P1
+	;;;;;;;;;;;;;;;;;;
+	inc TimerComeBackOptions
+	lda TimerComeBackOptions
+	cmp #TIME_TO_WAIT_COME_BACK_OPTIONS ;check if timer has completed
+	bne exitFreezeForGameOver
+	lda #BLOCK_OPTION ;after timer complete, show OPTIONS BLOCK
+	sta WhichBlockShow
+exitFreezeForGameOver
+;*************************************
+;*************************************
+;CHECK COLLISIONS AND DEAD - 1/2 MODE
+checkCollisionAndDeadP0
+	lda GameOption ;check if 1/2 mode
+	bne exitCheckCollisionAndDead ;if 1/2 mode then continue
+	lda #%10000000
+	bit CXP0FB
+	beq checkCollisionAndDeadP1
+	lda #TRUE
+	sta GameOver_P0
+	lda #FALSE
+	sta BooleanJoy0
+	jsr freezeP0
+checkCollisionAndDeadP1
+	lda #%10000000
+	bit CXP1FB
+	beq exitCheckCollisionAndDead
+	lda #TRUE
+	sta GameOver_P1
+	lda #FALSE
+	sta BooleanJoy1
+	jsr freezeP1
+exitCheckCollisionAndDead
+;*************************************
+;*************************************
+;CHECK COLLISIONS AND FREEZE - VS MODE
+checkCollisionAndFreezeP0
+	lda GameOption ;check if VS mode
+	beq exitCheckCollisionVS ;if VS mode then continue
+	lda #%10000000 ;check collision
+	bit CXP0FB
+	beq checkCollisionAndFreezeP1 ;no collision jump
+	lda #FULL_BAR ;restore all the bar after the freeze
+	sta BarTimeP0
+	jsr freezeP0
+checkCollisionAndFreezeP1
+;CHECK COLLISION WITH P1
+	lda #%10000000
+	bit CXP1FB
+	beq exitCheckCollisionVS ;no collision jump
+	lda #FULL_BAR ;restore all the bar after the freeze
+	sta BarTimeP1
+	jsr freezeP1
+exitCheckCollisionVS
+;*************************************
+checkJingle
+;******JINGLE GAME OVER***************
+;OVERWRITE GUN SFX
+	ldx #TRUE ;used to store the value
+	lda BarTimeP0
+	bne noSfxGameOverP0
+	;lda #FALSE
+	;sta GameOver_P0
+	lda PlayGameOverP0
+	bne noSfxGameOverP0 ;already set
+	stx PlayGameOverP0
+noSfxGameOverP0
+	lda BarTimeP1
+	bne noSfxGameOverP1
+	;lda #FALSE
+	;sta GameOver_P1
+	lda PlayGameOverP1
+	bne noSfxGameOverP1 ;already set
+	stx PlayGameOverP1
+noSfxGameOverP1
+;*************************************
+;**************************************
+;SHOW CUP FOR THE WINNER
+;GOAL CAN HAVE 2 VALUES
+;ONE FOR THE 1/2 AND ONE FOR VS
+	lda #TIME_TO_WAIT_AT_GOAL_ACHIEVED
+	sta Tmp
+	ldx #1
+checkCupPP
+	lda ScorePt1P0,x
+	cmp Goal ;if goal achieved then..
+	bne exitCheckCupPP
+	lda #%00001111 ;half #TRUE used to store the value
+	ora GameOver_P0,x
+	sta GameOver_P0,x ;joy stop to work
+	lda ShowHideCupsP0,x
+	bne checkCupSub ;already set
+	lda #TRUE ;set the first time
+	sta ShowHideCupsP0,x
+	lda #FALSE
+	sta BooleanJoy0,x
+checkCupSub
+;parameters x=Px | Tmp=TIME_TO_WAIT_AT_GOAL_ACHIEVED	
+	jsr tryToFreeze
+exitCheckCupPP
+	dex
+	bpl checkCupPP
+;*************************************
+;*************************************
+checkJoy
+    JOYSTICK_MACRO
+;*************************************
+;*************************************
+;necessary after joystick for correct bartime size
+;MANAGE TIMER ENERGY BAR
+;DECREASE BARTIME
+;VAR SPEEDENERGYLOST CAN HAVE 2 VALUES
+;ONE VALUE FOR 1/2 AND ONE FOR VS
+;INCREASE TIMERENERGYBARPX AND CHECK IF DECREASE THE BARTIME
+;TIMERFREEZEPX ACTIVATED BY COLLISION
+;manage for P0
+	ldx #1
+manageEnergyBar
+	lda TimerFreezeP0,x
+	bne skipManage
+	lda GameOver_P0,x
+	bne skipManage
+	lda BarTimeP0,x
+	and #FULL_BAR ;cut bit=0
+	sta BarTimeP0,x ;to fit in the trunk
+	inc TimerEnergyBarP0,x
+	lda TimerEnergyBarP0,x
+	cmp SpeedEnergyLost ;difficult to set - speed energy lost
+	bne skipManage
+	asl BarTimeP0,x ;decrease bar
+	lda #0
+	sta TimerEnergyBarP0,x ;reset timer
+skipManage
+	dex
+	bpl manageEnergyBar
+;**************************************
+;**************************************
+    lda GameOption
+    bne exitfireButton ;FALSE=single player - TRUE=VS game
+;*************************************
+checkFire
+    FIREBUTTON_MACRO
+exitfireButton
+;**************************************
+;**************************************
+;SET POSITION GUNS
+setBALL
+	ldy #4 ;ball
+	lda ReflectP1 ;check if the bear is mirrored
+	bne setBallOnTheRightP1
+setBallOnTheLeftP1
+	lda BooleanJoy1 ;joy pressed then fire
+	beq noShotP1
+	lda #POSITION_LEFT_P1+3 ;set new position M0
+	jmp posBALL
+noShotP1
+	lda #POSITION_LEFT_P1+2 ;set position M0
+	jmp posBALL
+setBallOnTheRightP1
+	lda BooleanJoy1 ;joy pressed then fire
+	beq noShotP1_2
+	lda #POSITION_RIGHT_P1-1
+	jmp posBALL
+noShotP1_2
+	lda #POSITION_RIGHT_P1
+posBALL
+	jsr roundPosition
+;*************************************
+;set M0 fire pressed or not
+	ldy #3 ;missile1
+	lda ReflectP0;check if the bear is mirrored
+	bne setMissileOnTheRightP0
+setMissileOnTheLeftP0
+	lda BooleanJoy0 ;joy pressed then fire
+	beq noShotP0
+	lda #POSITION_LEFT_P0+3 ;set new position M0
+	jmp posM1
+noShotP0
+	lda #POSITION_LEFT_P0+2 ;set position M0
+	jmp posM1
+setMissileOnTheRightP0
+	lda BooleanJoy0 ;joy pressed then fire
+	beq noShotP0_2
+	lda #POSITION_RIGHT_P0-1
+	jmp posM1
+noShotP0_2
+	lda #POSITION_RIGHT_P0
+posM1
+	jsr roundPosition
+endPosMissiles
+;*************************************
+;*****SET COLOR SKY*******************
+	lda #BLUE_SKY
+	sta COLUBK
+;*****SET TRUNKS PLAYFIELD************
+	lda #TRUNK
+	sta PF1
+	sta PF2
+;******KERNEL VIDEO*******************
+Loopa
+    lda INTIM
+    bne Loopa
+
+	sta WSYNC
+
+	lda #%00110101
+    sta CTRLPF ;mirror - playfield over GRPX - ball size 8
+;******DISABLE VBLANK*****************
+	lda #0
+    sta VBLANK
+
+	sta CursorArrayBranches
+	sta IdSprites
+;***BLOCK1 - CLOUDS********************************************************
+;***SET SIZE AND COPIES*****************
+	lda #6
+	sta NUSIZ0
+	sta NUSIZ1
+;***SET COLOR*****************
+	lda #WHITE
+	sta COLUP0
+	sta COLUP1
+;***SET POSITION**************
+	lda CoordXCloudOne
+	ldx CoordXCloudTwo
+	jsr setPositionAndPointers ;HMOVE HMCLR inside subroutine
+;********************************
+
+;***CLOUD***************
+	ldy #6
+	jsr drawSprites
+;***********************
+	sta WSYNC
+	sta WSYNC
+;***BRANCHES***************
+	ldy CursorArrayBranches
+	jsr drawwBranches
+;**************************
+
+;***BLOCK2 - CLOUDS*********************
+;***SET SIZE AND COPIES*****************
+	lda #5
+	sta NUSIZ0
+	sta NUSIZ1
+	;lda #WHITE
+	;sta COLUP0
+	;sta COLUP1
+;***SET POSITION*****************
+	lda CoordXCloudThree
+	ldx CoordXCloudFour
+	jsr setPositionAndPointers ;HMOVE HMCLR inside subroutine
+;********************************
+
+;***CLOUD***************
+	ldy #3
+	jsr drawSprites
+;***********************
+	sta WSYNC
+	sta WSYNC
+	sta WSYNC
+	sta WSYNC
+	sta WSYNC
+;***BRANCHES***************
+	ldy CursorArrayBranches
+	jsr drawwBranches
+;**************************
+;or title screen or empty
+yesTitleScreen
+	lda ShowTitleScreen
+	beq noTitleScreen
+	jsr drawLogo
+	jmp postTitleScreen
+noTitleScreen
+;***BLOCK3 - EMPTY********************************************************
+	jsr drawEmpty
+;***BLOCK4 - EMPTY********************************************************
+	jsr drawEmpty
+;***BLOCK5 - BUSHES********************************************************
+postTitleScreen
+;***SET SIZE AND COPIES*****************
+	lda #3;7
+	sta NUSIZ0
+	sta NUSIZ1
+	lda #GREEN
+	sta COLUP0
+	sta COLUP1
+;***SET POSITION*****************
+	lda #12
+	ldx #18
+	jsr setPositionAndPointers ;HMOVE HMCLR inside subroutine
+;********************************
+;***DRAW BUSHES**********
+setBushes
+	ldy #2
+	MULTIPLE_SPRITE ;jsr drawSprites
+;***********************
+	sta WSYNC
+	lda #GREEN
+	sta COLUBK
+	lda #0
+	sta GRP0
+	sta GRP1
+	sta WSYNC
+	sta WSYNC
+	sta WSYNC
+	sta WSYNC
+	sta WSYNC
+;***BRANCHES***************
+	ldy CursorArrayBranches
+	jsr drawwBranches
+;**************************
+
+;***BLOCK6 - TIME BAR***************************************************
+;***SET SIZE AND COPIES*****************
+	lda #5 ;double size
+	sta NUSIZ0
+	sta NUSIZ1
+	lda #%00110001
+    sta CTRLPF ;mirror - playfield NO over GRPX - ball size 8
+;***SET COLOR*****************
+	lda #RED
+	sta COLUP0
+	sta COLUP1
+;***SET POSITION**************
+	lda #POSITION_BAR_P0
+	ldx #POSITION_BAR_P1
+	jsr setPositionAndPointers ;HMOVE HMCLR inside subroutine
+;***DRAW BARS***********
+setBars
+	ldy #0
+	jsr drawSprites ;draw energy bars
+	sta WSYNC
+	sta WSYNC
+	sta WSYNC
+	sta WSYNC
+	sta WSYNC
+	lda #FULL_BAR ;frame of the bar
+	sta GRP0
+	sta GRP1
+	ldy #6
+;now the bears!	
+	sta WSYNC
+	lda #0
+	sta GRP0
+	sta GRP1
+	lda #%00110000 ;1 copy and missile 8pixel
+	sta NUSIZ0
+	sta NUSIZ1
+	sta WSYNC
+	sta CXCLR ;clear all collisions - clouds and energy bars
+	sta WSYNC
+;***BRANCHES***************
+	ldy CursorArrayBranches
+	jsr drawwBranches
+;**************************
+;set position bears
+	ldy #0
+	lda CoordXBearP0
+	jsr roundPosition
+	ldy #1
+	lda CoordXBearP1
+	jsr roundPosition
+	sta WSYNC
+	sta HMOVE
+	sta WSYNC
+	sta HMCLR
+	lda ReflectP0
+	sta REFP0
+	lda ReflectP1
+	sta REFP1
+	sta WSYNC
+;***********************
+;***BLOCK7 - BEARS********************************************************
+	ldy #23
+	DRAW_GRP_POSSIBLE_MISSING_TRUNK
+	DRAW_GRP_AND_BRANCHES
+	DRAW_GRP_MISSILE_AND_BALL
+	ldx #0 ;disable missile and ball
+drawBears
+    lda #TRUNK
+	sta WSYNC
+	sta PF1
+	sta PF2
+	lda BearOne,y
+	sta GRP0
+	sta GRP1
+	lda ColorBearOne,y
+	sta COLUP0
+    stx ENAM1
+	lda ColorBearTwo,y
+	sta COLUP1
+    stx ENABL;ENAM0
+    SLEEP #8
+    lda #TRUNK
+	sta PF1
+	sta PF2
+	dey
+	bpl drawBears
+;***********************
+;***BLOCK8 - SCORE CUPS GAME MODE****************************************
+;no trunks
+	sta WSYNC
+	lda #DARK_GREEN
+	sta COLUBK
+	lda #0 ;turn off data of GRPs, Playfield and Reflect registers
+	sta GRP0
+	sta GRP1
+	sta PF1
+	sta PF2
+	sta REFP0
+	sta REFP1
+;prepare score
+	;sta WSYNC
+	lda #4 ;2 copies wide
+	sta NUSIZ0
+	sta NUSIZ1
+;***SET POSITION*****************
+	lda #POSITION_SCORE
+	ldy #0
+	jsr roundPosition
+	lda #POSITION_SCORE+10
+	ldy #1
+	jsr roundPosition
+	sta WSYNC
+	sta HMOVE
+;***SET COLOR*****************
+	lda #WHITE
+	sta COLUP0
+	sta COLUP1
+	SCORE_BOTH_PLAYERS ;macro draw score
+;***BLOCK9******************************
+;***SET SIZE AND COPIES*****************
+	sta WSYNC
+;set timer
+	lda #36
+	sta TIM64T
+;reset GRP
+	lda #0
+	sta GRP0
+	sta GRP1
+
+;****FIND WHAT SHOW
+;****0)OPTIONS 1)COUNTDOWN-CUPS
+	lda WhichBlockShow
+	bne showCountDown
+;***DRAW OPTIONS-COUNTDOWN-CUPS***************
+showOptions
+	SELECT_OPTION_GAME
+midTermTimer_
+	lda INTIM ;all the code be done before to draw
+	cmp #24 ;started with #24
+	bcs midTermTimer_
+	;need Y value for the soubroutine
+	ldy #17
+	jsr showAllOptions
+	jmp preLoopTimer	
+
+showCountDown
+	COUNTDOWN_AND_CUP
+midTermTimer
+	lda INTIM ;all the code be done before to draw
+	cmp #24 ;started with #24
+	bcs midTermTimer
+	;need Y value for the soubroutine
+	ldy #9
+	jsr drawSprites
+;*********************************************
+preLoopTimer
+	sta WSYNC
+	lda #0
+	sta GRP0
+	sta GRP1
+loopTimer
+	lda INTIM ;to complete the missing lines on screen
+	bne loopTimer
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
+; Reenable VBLANK for bottom (and top of next frame)
+LVOver
+	sta WSYNC
+	lda #%00000010
+	sta VBLANK
+	lda #37 ;29 lines x 76 cycles per line = 2204 cycles / 64 = 34
+	sta TIM64T
+
+	lda WhichBlockShow ;if block of options, then reset everytime the vars begin game
+	bne soundEffect
+    jsr initVarsBeginGameP0 ;so reset them
+    jsr initVarsBeginGameP1 ;so reset them
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+soundEffect
+;x=0 jingle GameOver P0
+;x=1 jingle GameOver P1
+	ldx #1
+manageSFX
+	lda PlayGameOverP0,x
+	beq exitManageSFX ;if zero no gameover
+	and #%10000000 ;mask for check is already played
+	beq exitManageSFX ;if zero already played
+	lsr PlayGameOverP0,x ;from #%11111111 to #%01111111
+	;lda #SFX_GAMEOVER_P0 ;set victory song
+	lda TableConstForSFX,x
+	sta IdSfxP0,x
+exitManageSFX
+	dex
+	bpl manageSFX
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;x=0 Victory song P0
+;x=1 Victory song P1
+	ldx #1
+manageAudio
+	lda ShowHideCupsP0,x
+	beq exitManageAudio ;if zero no cup
+	and #%10000000 ;mask for check is already played
+	beq exitManageAudio ;if zero already played
+	lsr ShowHideCupsP0,x ;from #%11111111 to #%01111111
+		;lda #SFX_VICTORY_BEAR0 ;set victory song
+	lda TableConstForSong,x
+	sta IdSfxP0,x
+exitManageAudio
+	dex
+	bpl manageAudio
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	PLAY_SOUND_MACRO
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+checkCutTrunkOne
+	lda CutSectionOfTrunkOne
+	bne checkCutTrunkTwo
+	inc TriggerCountFrameTrunkOne
+	lda TriggerCountFrameTrunkOne
+	cmp #FRAMES_BEFORE_TRUNK_FALL_DOWN
+	bne checkCutTrunkTwo ;LoopaOverscan
+    lda #FULL_SIZE_TRUNK ;restore trunk
+    sta CutSectionOfTrunkOne
+	lda #0
+	sta TriggerCountFrameTrunkOne ;set trigger to zero for the next time
+	jsr updateScoreAndBranchesPL0
+checkCutTrunkTwo
+	lda CutSectionOfTrunkTwo
+	bne LoopaOverscan
+	inc TriggerCountFrameTrunkTwo
+	lda TriggerCountFrameTrunkTwo
+	cmp #FRAMES_BEFORE_TRUNK_FALL_DOWN
+	bne LoopaOverscan
+    lda #FULL_SIZE_TRUNK ;restore trunk
+    sta CutSectionOfTrunkTwo
+	lda #0
+	sta TriggerCountFrameTrunkTwo ;set trigger to zero for the next time
+	jsr updateScoreAndBranchesPL1
+
+LoopaOverscan
+	lda INTIM
+	bne LoopaOverscan
+	jmp NextFrame
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;SUBROUTINE
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+updateScore
+	sed
+	clc ;Clear Carry
+	lda ScorePt2P0,x
+    adc #$01
+	sta ScorePt2P0,x
+    cld
+	bcc exitUpdateScore
+	inc ScorePt1P0,x
+exitUpdateScore
+	rts
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;SUBROUTINE position obj and create a pointer
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+setPositionAndPointers
+;setPosition
+	;coordinate grp0 already in AC
+	ldy #0 ;GRP0
+	jsr roundPosition
+;def pointer
+	ldy IdSprites
+	lda TableSpiteLow,y
+	sta Pointer_One_Low
+	lda TableSpriteHi,y
+	sta Pointer_One_Hi
+;setPosition
+	ldy #1 ;GRP1
+	txa ;coordinate grp1
+	jsr roundPosition
+;def pointer
+	inc IdSprites
+	ldy IdSprites
+	lda TableSpiteLow,y
+	sta Pointer_Two_Low
+	lda TableSpriteHi,y
+	sta Pointer_Two_Hi
+
+	sta WSYNC
+	sta HMOVE
+	inc IdSprites
+	sta WSYNC
+	sta HMCLR
+	rts
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;SUBROUTINE called by COUNTDOWN MACRO
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;compare various values
+checkForBeep
+	dec TimerForCountDownP0,x
+	beq .setBeep ;countdown at zero
+	lda TimerForCountDownP0,x
+	cmp #120
+	beq .setBeep
+	cmp #60
+	beq .setBeep
+	;cmp #1 ;no check zero because it finishs at zero
+	;beq .setBeep
+	jmp .oneSecond ;begin to check which number show at screen
+.setBeep
+	lda #SFX_BEEP
+	sta IdSfxP0,x
+.oneSecond
+	lda TimerForCountDownP0,x
+	cmp #60 ;1 second
+	bcs .twoSeconds
+	ldy #1 ;number 1 the TableNumCountDown
+	rts
+.twoSeconds
+	cmp #120 ;2 seconds
+	bcs .threeSeconds
+	ldy #2 ;number 2 the TableNumCountDown
+	rts
+.threeSeconds
+	;cmp #180 ;3 seconds
+	ldy #3 ;number 3 the TableNumCountDown
+
+	lda #TRUE
+	rts
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;SUBROUTINE called by PLAY_SOUND_MACRO
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+SoundEffectCH0
+	ldy CursorSound0
+	;last 3 datas must be zero, so all the sounds stop
+	lda (SoundDataLow0),y
+	sta AUDC0
+	iny
+	lda (SoundDataLow0),y
+	sta AUDF0
+	iny
+	lda (SoundDataLow0),y
+	sta TempoCH0
+	beq .endSoundCH0
+	iny
+	sty CursorSound0
+.endSoundCH0
+	rts
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;SUBROUTINE called by PLAY_SOUND_MACRO
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+SoundEffectCH1
+	ldy CursorSound1
+	;last 3 datas must be zero, so all the sounds stop
+	lda (SoundDataLow1),y
+	sta AUDC1
+	iny
+	lda (SoundDataLow1),y
+	sta AUDF1
+	iny
+	lda (SoundDataLow1),y
+	sta TempoCH1
+	beq .endSoundCH1
+	iny
+	sty CursorSound1
+.endSoundCH1
+	rts
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;SUBROUTINE draw GRP0 and GRP1
+;Y=height of the sprites
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+drawSprites
+	sta WSYNC
+	lda (Pointer_One_Low),y
+	sta GRP0
+	lda (Pointer_Two_Low),y
+	sta GRP1
+	dey
+	bpl drawSprites
+	rts
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;SUBROUTINE draw GRP0 and GRP1 with options
+;Y=height of the sprites
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+showAllOptions
+	sta WSYNC
+	lda (Pointer_One_Low),y
+	sta GRP0
+	lda (Pointer_Two_Low),y
+	sta GRP1
+	SLEEP #26
+	lda (Pointer_Switch_Left_Low),y
+	sta GRP0
+	lda (Pointer_Switch_Right_Low),y
+	sta GRP1
+	dey
+	bpl showAllOptions
+	rts
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;SUBROUTINE draw empty block
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;***BLOCK EMPTY*******************************
+drawEmpty	
+	ldy #14
+emptyGroundOne
+	sta WSYNC
+	dey
+	bpl emptyGroundOne
+;***BRANCHES***************
+	ldy CursorArrayBranches
+	;jsr drawwBranches
+	;rts
+	;continue belove... don't move this subroutine
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;SUBROUTINE draw branches
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;drawBranch for 2 lines
+drawwBranches
+	ldx #2 ;draw it per 3 lines
+loopDrawBranches
+	sta WSYNC
+	lda ArraySideLeftTreeOne,y
+	sta PF1
+	lda ArraySideRightTreeOne,y
+	sta PF2
+	SLEEP #16
+	lda ArraySideLeftTreeTwo,y
+	sta PF1
+	lda ArraySideRightTreeTwo,y
+	sta PF2
+	dex
+	bpl loopDrawBranches
+
+;set both Trunks with no branch
+	sta WSYNC
+	lda #$03
+	sta PF1
+	sta PF2
+
+	inc CursorArrayBranches
+
+	rts
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;SUBROUTINE Update clouds
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+updateClouds
+	bne exitUpdateClound
+checkCloudUp
+	inc CoordXCloudOne,x
+	lda CoordXCloudOne,x
+	cmp #DIM_SCREEN
+	bne noEndScreen
+	lda #BEGINSCREEN
+	sta CoordXCloudOne,x
+noEndScreen
+	dex
+	dey
+	bpl checkCloudUp
+exitUpdateClound
+	rts
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;SUBROUTINE update score PL0
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+updateScoreAndBranchesPL0
+	ldx #0
+	jsr updateScore
+	ldy #6 ;dim array branches (7)
+	ldx #5 ;dim-1 per shift the values
+	;jsr shiftBranches
+	;rts
+	jmp shiftBranches
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;SUBROUTINE update score PL1
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+updateScoreAndBranchesPL1
+	ldx #1
+	jsr updateScore
+	ldy #20 ;dim array branches (7)
+	ldx #19 ;dim-1 per shift the values
+	;jsr shiftBranches
+	;rts
+	;jmp shiftBranches
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;SUBROUTINE shift elements and get new one
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+shiftBranches
+	lda #5 ;0..5 = 6 branches shift - 7th get random value
+	sta Temp
+loopShiftBranches
+	lda ArraySideLeftTreeOne,x ;ArraySideLeftTreeTwo,x
+	sta ArraySideLeftTreeOne,y
+	lda ArraySideRightTreeOne,x ;ArraySideLeftTreeTwo,x
+	sta ArraySideRightTreeOne,y
+	dey
+	dex
+	dec Temp
+	bpl loopShiftBranches
+;setBranch new value per i=0
+	jsr nextBranch ;get random value for the empty element in the array
+	tay ;y is id for the table
+	inx ;turn x=0 for first array - for the second array a relative zero
+	lda LeftBranch,y ;TableLeftBranch,y
+	sta ArraySideLeftTreeOne,x ;ArraySideLeftTreeTwo,x
+	lda RightBranch,y ;TableRightBranch,y
+	sta ArraySideRightTreeOne,x ;ArraySideLeftTreeTwo,x
+	rts
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;SUBROUTINE delete piece of trunk1 and branch
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+deleteTrunkAndBranchTreeOne
+	lda #0
+    sta CutSectionOfTrunkOne ;piece of trunk is going
+    ldx CursorArrayBranches ;still has the value. reset in VBLANC
+	sta ArraySideLeftTreeOne,x ;piece of trunk and branch are going
+	sta ArraySideRightTreeOne,x
+	rts
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;SUBROUTINE delete piece of trunk2 and branch
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+deleteTrunkAndBranchTreeTwo
+	lda #0
+    sta CutSectionOfTrunkTwo ;piece of trunk is going
+    ldx CursorArrayBranches ;still has the value. reset in VBLANC
+	sta ArraySideLeftTreeTwo,x ;piece of trunk and branch are going
+	sta ArraySideRightTreeTwo,x
+	rts
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;SUBROUTINE find next random element
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+nextBranch
+	ldy TimerForAll ;get the value at every start
+	lda Loopa,y ;seed ... must start somewhere ;)
+ ;get random value
+    ;bcc notEor
+	ldy IndexForRandom
+	eor $80,y
+notEor
+	and #%00000011 ;mask for the object
+	rts
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;SUBROUTINE
+;FREEZE AFTER COLLISION P0
+;DELETE LAST BRANCH
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+freezeP0
+	inc TimerFreezeP0 ;the trigger is the collision
+	lda TimerFreezeP0
+	cmp #1 ;check if set sfx for collision
+	bne afterSfxCXP0
+	ldy #SFX_CX_BRANCH_PP ;set sfx for collision
+	sty IdSfxP0
+afterSfxCXP0
+	cmp #TIME_TO_WAIT_FOR_COLLISION ;check if all frames are gone
+	bne exitCheckCollisionP0
+	lda #0
+	sta TimerFreezeP0 ;reset timer
+	ldx #6 ;last element of the vector of branches
+	lda #TRUNK ;delete branch of collision
+	sta ArraySideLeftTreeOne,x ;delete possible left branch
+	sta ArraySideRightTreeOne,x ;delete possible right branch
+exitCheckCollisionP0
+	rts
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;SUBROUTINE
+;FREEZE AFTER COLLISION P1
+;DELETE LAST BRANCH
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+freezeP1
+	inc TimerFreezeP1 ;the trigger is the collision
+	lda TimerFreezeP1
+	cmp #1 ;check if set sfx for collision
+	bne afterSfxCXP1
+	ldy #SFX_CX_BRANCH_PP ;set sfx for collision
+	sty IdSfxP1
+afterSfxCXP1
+	cmp #TIME_TO_WAIT_FOR_COLLISION ;check if all frames are gone
+	bne exitCheckCollisionP1
+	lda #0
+	sta TimerFreezeP1 ;reset timer
+	ldx #6 ;last element of the vector of branches
+	lda #TRUNK ;delete branch of collision
+	sta ArraySideLeftTreeTwo,x ;delete possible left branch
+	sta ArraySideRightTreeTwo,x ;delete possible right branch
+exitCheckCollisionP1
+	rts
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;SUBROUTINE
+;IF GAMEOVER=TRUE THEN EXIT
+;FIRST 4 BITS GAMEOVER THEN CAN START TIMER
+;WHEN TIMER IS COMPLETE THE GAMEOVER=TRUE 
+tryToFreeze
+	lda GameOption
+	bne exitTryToFreeze
+	lda GameOver_P0,x
+	beq exitTryToFreeze ;exit if not gameover
+	cmp #TRUE ;if TRUE then timer already compete
+	beq exitTryToFreeze
+continueFreeze
+	inc TimerFreezeP0,x
+	lda TimerFreezeP0,x
+	cmp Tmp ;value set before call subroutine
+	bne exitTryToFreeze
+	lda #0
+	sta TimerFreezeP0,x
+	lda #TRUE ;so next cycle exit
+	sta GameOver_P0,x
+exitTryToFreeze
+	rts
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;SUBROUTINE
+initVariables
+	lda #6
+	sta AUDV0
+	sta AUDV1
+	lda #0
+	sta CursorSound0
+	sta CursorSound1
+	sta TempoCH0
+	sta TempoCH1
+	;lda BLOCK_OPTION ;0
+	sta WhichBlockShow ;options - first block to show
+	lda #%00110101
+    sta CTRLPF ;mirror - playfield over GRPX - ball size 8
+	rts
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;SUBROUTINE
+;reset vars at begins game
+;subroutine called when fire is pressed
+;set trees with no branches
+initVarsBeginGameP0
+	ldy #DIM_ARRAY_BRANCHES ; 7 elements
+	lda #TRUNK ;no branches
+	sta CutSectionOfTrunkOne ;necessary to draw full or empty trunk
+noBranchesTreeLeft
+	sta ArraySideLeftTreeOne,y
+	sta ArraySideRightTreeOne,y
+	dey
+	bpl noBranchesTreeLeft
+	lda #FULL_BAR
+	sta BarTimeP0
+	lda #POSITION_LEFT_P0 ;left side of the trunk
+	sta CoordXBearP0
+	lda #0
+	sta TimerFreezeP0
+	sta PlayGameOverP0
+	sta TimerComeBackOptions
+	;lda #FALSE ; AC=0
+	sta ShowHideCupsP0
+	sta ReflectP0
+	rts
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;SUBROUTINE
+;reset vars at begins game
+;subroutine called when fire is pressed
+;set trees with no branches
+initVarsBeginGameP1
+	ldy #DIM_ARRAY_BRANCHES ; 7 elements
+	lda #TRUNK ;no branches
+	sta CutSectionOfTrunkTwo ;necessary to draw full or empty trunk
+noBranchesTreeRight
+	sta ArraySideLeftTreeTwo,y
+	sta ArraySideRightTreeTwo,y
+	dey
+	bpl noBranchesTreeRight
+	lda #FULL_BAR
+	sta BarTimeP1
+	lda #POSITION_RIGHT_P1 ;right side of the trunk
+	sta CoordXBearP1
+	lda #0
+	sta TimerFreezeP1
+	sta PlayGameOverP1
+	sta TimerComeBackOptions
+	;lda #FALSE ; AC=0
+	sta ShowHideCupsP1
+	;necessary for mirror at the begin, the ball-pistol for P1
+	lda #TRUE
+	sta ReflectP1
+    rts
+;*************************************
+VictorySongBear0
+	.byte $06, $12, $0d
+	.byte $00, $00, $02	
+	.byte $06, $12, $12
+	.byte $06, $13, $08
+	.byte $06, $12, $08
+	.byte $06, $10, $17
+	.byte $06, $16, $17
+
+	.byte $06, $0e, $0c
+	.byte $00, $00, $02	
+	.byte $06, $0e, $0f
+
+	.byte $06, $10, $08	
+	.byte $06, $0e, $10
+	.byte $06, $0d, $2b
+
+	.byte $00, $00, $00
+VictorySongBear1
+	.byte $0c, $17, $0d
+	.byte $00, $00, $02
+	.byte $0c, $17, $12
+	.byte $0c, $18, $08
+	.byte $0c, $17, $08
+	.byte $0c, $14, $17
+	.byte $0c, $1b, $17
+
+	.byte $0c, $12, $0c
+	.byte $00, $00, $02
+	.byte $0c, $12, $0f
+
+	.byte $0c, $14, $08	
+	.byte $0c, $12, $10
+	.byte $0c, $11, $2b
+
+	.byte $00, $00, $00
+;SFX
+SfxCxBranchPP
+	.byte $06, $10, $03
+	.byte $06, $11, $03
+	.byte $06, $12, $03
+	.byte $06, $10, $03
+	.byte $06, $11, $03
+	.byte $06, $12, $03
+	.byte $06, $10, $03
+	.byte $06, $11, $03
+	.byte $06, $12, $03
+	.byte $00, $00, $00
+GunLeftBear
+	.byte $08, $08, $01
+	.byte $0e, $04, $01
+	.byte $00, $00, $00
+GunRightBear
+	.byte $08, $04, $01
+	.byte $0e, $01, $01
+	.byte $00, $00, $00
+CountDownSfx
+	.byte $04, $18, $02
+	.byte $0c, $10, $02
+	.byte $00, $00, $00
+SfxGameOverP0
+	.byte $06, $15, $0f
+	.byte $06, $16, $0f
+	.byte $06, $17, $0f
+	.byte $06, $19, $1e
+	.byte $00, $00, $00
+SfxGameOverP1
+	.byte $0c, $1a, $0f
+	.byte $0c, $1b, $0f
+	.byte $0c, $1d, $0f
+	.byte $0c, $1f, $1e
+	.byte $00, $00, $00
+
+;numbers for countdown
+Three
+	.byte $FE ; |XXXXXXX |
+	.byte $FE ; |XXXXXXX |
+	.byte $06 ; |     XX |
+	.byte $06 ; |     XX |
+	.byte $3E ; |  XXXXX |
+	.byte $3E ; |  XXXXX |
+	.byte $06 ; |     XX |
+	.byte $06 ; |     XX |
+	.byte $FE ; |XXXXXXX |
+	.byte $FE ; |XXXXXXX |
+Two
+	.byte $FE ; |XXXXXXX |
+	.byte $FE ; |XXXXXXX |
+	.byte $C0 ; |XX      |
+	.byte $C0 ; |XX      |
+	.byte $FE ; |XXXXXXX |
+	.byte $FE ; |XXXXXXX |
+	.byte $06 ; |     XX |
+	.byte $06 ; |     XX |
+	.byte $FE ; |XXXXXXX |
+	.byte $FE ; |XXXXXXX |
+One
+	.byte $7E ; | XXXXXX |
+	.byte $7E ; | XXXXXX |
+	.byte $18 ; |   XX   |
+	.byte $18 ; |   XX   |
+	.byte $18 ; |   XX   |
+	.byte $18 ; |   XX   |
+	.byte $18 ; |   XX   |
+	.byte $78 ; | XXXX   |
+	.byte $78 ; | XXXX   |
+	.byte $18 ; |   XX   |
+
+RightCloud
+	.byte $00 ; |        |
+	.byte $FF ; |XXXXXXXX|
+	.byte $FF ; |XXXXXXXX|
+	.byte $FE ; |XXXXXXX |
+	.byte $FE ; |XXXXXXX |
+	.byte $FC ; |XXXXXX  |
+	.byte $F0 ; |XXXX    |
+LeftCloud
+	.byte $00 ; |        |
+	.byte $FF ; |XXXXXXXX|
+	.byte $7F ; | XXXXXXX|
+	.byte $7F ; | XXXXXXX|
+	.byte $3F ; |  XXXXXX|
+	.byte $19 ; |   XX  X|
+	.byte $00 ; |        | ;can share with other cloud
+LeftDownCloud
+	.byte $00 ; |        |
+	.byte $FF ; |XXXXXXXX|
+	.byte $7B ; | XXXX XX|
+	.byte $31 ; |  XX   X|
+RightDownCloud
+	.byte $00 ; |        |
+	.byte $FF ; |XXXXXXXX|
+	.byte $DE ; |XX XXXX |
+	.byte $8C ; |X   XX  |
+Bush
+	.byte $FF ; |XXXXXXXX|
+	.byte $7E ; | XXXXXX |
+	.byte $3C ; |  XXXX  |
+Cup
+	.byte $7C ; | XXXXX  |
+	.byte $38 ; |  XXX   |
+	.byte $10 ; |   X    |
+	.byte $10 ; |   X    |
+	.byte $38 ; |  XXX   |
+	.byte $7C ; | XXXXX  |
+	.byte $BA ; |X XXX X |
+	.byte $BA ; |X XXX X |
+	.byte $FE ; |XXXXXXX |
+	.byte $BA ; |X XXX X |
+SinglePlayer
+	.byte $53 ; | X X  XX|
+	.byte $52 ; | X X  X |
+	.byte $52 ; | X X  X |
+	.byte $5B ; | X XX XX|
+	.byte $49 ; | X  X  X|
+	.byte $C9 ; |XX  X  X|
+	.byte $4B ; | X  X XX|
+	.byte $00 ; |        |
+	.byte $00 ; |        |
+	.byte $7E ; | XXXXXX |
+	.byte $7E ; | XXXXXX |
+	.byte $7E ; | XXXXXX |
+	.byte $14 ; |   X X  |
+	.byte $10 ; |   X    |
+	.byte $10 ; |   X    |
+	.byte $10 ; |   X    |
+	.byte $10 ; |   X    |
+	.byte $10 ; |   X    |
+Versus
+	.byte $4E ; | X  XXX |
+	.byte $42 ; | X    X |
+	.byte $A2 ; |X X   X |
+	.byte $AE ; |X X XXX |
+	.byte $A8 ; |X X X   |
+	.byte $A8 ; |X X X   |
+	.byte $AE ; |X X XXX |
+	.byte $00 ; |        |
+	.byte $00 ; |        |
+	.byte $7E ; | XXXXXX |
+	.byte $7E ; | XXXXXX |
+	.byte $7E ; | XXXXXX |
+	.byte $14 ; |   X X  |
+	.byte $10 ; |   X    |
+	.byte $10 ; |   X    |
+	.byte $10 ; |   X    |
+	.byte $10 ; |   X    |
+	.byte $10 ; |   X    |
+
+OneHundred
+	.byte $E0 ; |XXX     |
+	.byte $A0 ; |X X     |
+	.byte $A0 ; |X X     |
+	.byte $A0 ; |X X     |
+	.byte $E0 ; |XXX     |
+	.byte $00 ; |        |
+	.byte $E0 ; |XXX     |
+	.byte $A0 ; |X X     |
+	.byte $A0 ; |X X     |
+	.byte $A0 ; |X X     |
+	.byte $E0 ; |XXX     |
+	.byte $00 ; |        |
+	.byte $E0 ; |XXX     |
+	.byte $40 ; | X      |
+	.byte $40 ; | X      |
+	.byte $40 ; | X      |
+	.byte $C0 ; |XX      |
+	.byte $40 ; | X      |
+TwoHundred
+	.byte $E0 ; |XXX     |
+	.byte $A0 ; |X X     |
+	.byte $A0 ; |X X     |
+	.byte $A0 ; |X X     |
+	.byte $E0 ; |XXX     |
+	.byte $00 ; |        |
+	.byte $E0 ; |XXX     |
+	.byte $A0 ; |X X     |
+	.byte $A0 ; |X X     |
+	.byte $A0 ; |X X     |
+	.byte $E0 ; |XXX     |
+	.byte $00 ; |        |
+	.byte $E0 ; |XXX     |
+	.byte $80 ; |X       |
+	.byte $80 ; |X       |
+	.byte $E0 ; |XXX     |
+	.byte $20 ; |  X     |
+	.byte $E0 ; |XXX     |
+SomeBranches
+	.byte $3C ; |  XXXX  |
+	.byte $3C ; |  XXXX  |
+	.byte $3C ; |  XXXX  |
+	.byte $3F ; |  XXXXXX|
+	.byte $3C ; |  XXXX  |
+	.byte $3C ; |  XXXX  |
+	.byte $3C ; |  XXXX  |
+	.byte $3C ; |  XXXX  |
+	.byte $3C ; |  XXXX  |
+	.byte $FC ; |XXXXXX  |
+	.byte $3C ; |  XXXX  |
+	.byte $3C ; |  XXXX  |
+	.byte $3C ; |  XXXX  |
+	.byte $3C ; |  XXXX  |
+	.byte $3C ; |  XXXX  |
+	.byte $3F ; |  XXXXXX|
+	.byte $3C ; |  XXXX  |
+	.byte $3C ; |  XXXX  |
+AllBranches
+	.byte $3C ; |  XXXX  |
+	.byte $FC ; |XXXXXX  |
+	.byte $3C ; |  XXXX  |
+	.byte $3F ; |  XXXXXX|
+	.byte $3C ; |  XXXX  |
+	.byte $FC ; |XXXXXX  |
+	.byte $3C ; |  XXXX  |
+	.byte $3F ; |  XXXXXX|
+	.byte $3C ; |  XXXX  |
+	.byte $FC ; |XXXXXX  |
+	.byte $3C ; |  XXXX  |
+	.byte $3F ; |  XXXXXX|
+	.byte $3C ; |  XXXX  |
+	.byte $FC ; |XXXXXX  |
+	.byte $3C ; |  XXXX  |
+	.byte $3F ; |  XXXXXX|
+	.byte $3C ; |  XXXX  |
+	.byte $3C ; |  XXXX  |
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;SUBROUTINE Draw logo
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	align $100
+drawLogo
+	lda #0
+	sta GRP0
+	sta GRP1
+
+	sta WSYNC
+	lda #3
+	sta NUSIZ0
+	sta NUSIZ1	; both players have 3 copies
+	;lda #1
+	sta VDELP0
+	sta VDELP1
+	lda #59
+	ldy #0
+	jsr roundPosition ;position GRP0
+
+	lda #67
+	ldy #1
+	jsr roundPosition ;position GRP1
+
+	sta WSYNC
+	sta HMOVE
+
+	lda #21 ;logo dimension
+	sta Temp
+
+	lda #COLOR_LOGO_ON;
+	sta COLUP0
+	sta COLUP1
+
+.drawLoopLogo
+	ldy Temp ;counts backwards
+	lda logo_5,y ;6th
+	sta Tmp
+
+	sta WSYNC
+	SLEEP #8
+	lda logo_0,y ;1st
+	sta GRP0
+	lda logo_1,y ;2nd
+	sta GRP1
+	lda logo_2,y ;3rd
+	sta GRP0
+	lda logo_4,y ;5th
+	tax
+	lda logo_3,y ;4th
+	ldy Tmp
+	sta GRP1 ;4th
+	stx GRP0 ;5th
+	sty GRP1 ;6th
+	sta GRP0
+	dec Temp ;go to next line
+
+	bpl .drawLoopLogo ;repeat until < 0
+	ldy #9
+postLogo
+	sta WSYNC
+	lda #0
+	sta VDELP0
+	sta VDELP1
+	dey
+	bpl postLogo
+
+	rts
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+logo_0
+	.byte %00000000
+	.byte %11101110
+	.byte %10100010
+	.byte %11101110
+	.byte %10001010
+	.byte %10001010
+	.byte %00000000
+	.byte %00000000
+	.byte %00000000
+	.byte %00110011
+	.byte %00110011
+	.byte %00110011
+	.byte %00110011
+	.byte %00110011
+	.byte %00110011
+	.byte %00110011
+	.byte %00110000
+	.byte %00110011
+	.byte %00110000
+	.byte %11111100
+	.byte %11111100
+	.byte %00000000
+
+logo_1
+	.byte %00000000
+	.byte %01110101
+	.byte %01000100
+	.byte %01000101
+	.byte %01000101
+	.byte %01110101
+	.byte %00000000
+	.byte %00000000
+	.byte %00000000
+	.byte %01100001
+	.byte %01100001
+	.byte %01100001
+	.byte %01100001
+	.byte %01100001
+	.byte %01101101
+	.byte %01111111
+	.byte %01110011
+	.byte %01100001
+	.byte %00000000
+	.byte %00000000
+	.byte %00000000
+	.byte %00000000
+
+logo_2
+	.byte %00000000
+	.byte %11010101
+	.byte %01010101
+	.byte %11011101
+	.byte %00010101
+	.byte %11011101
+	.byte %00000000
+	.byte %00000000
+	.byte %00000000
+	.byte %10111111
+	.byte %10111111
+	.byte %10110001
+	.byte %10110001
+	.byte %10110001
+	.byte %10111111
+	.byte %10111111
+	.byte %10110011
+	.byte %10110011
+	.byte %00110011
+	.byte %00111111
+	.byte %00111110
+	.byte %00000000
+
+logo_3
+	.byte %00000000
+	.byte %01011100
+	.byte %01010100
+	.byte %01010100
+	.byte %01010100
+	.byte %11011100
+	.byte %00000000
+	.byte %00000000
+	.byte %00000000
+	.byte %00111110
+	.byte %10111110
+	.byte %10110000
+	.byte %10110000
+	.byte %10111110
+	.byte %10110010
+	.byte %00110010
+	.byte %00111110
+	.byte %00111110
+	.byte %00000000
+	.byte %00000000
+	.byte %00000000
+	.byte %00000000
+
+logo_4
+	.byte %00000000
+	.byte %01110111
+	.byte %01000101
+	.byte %01110101
+	.byte %00010101
+	.byte %01110111
+	.byte %00000000
+	.byte %00000000
+	.byte %00000000
+	.byte %11111011
+	.byte %11001011
+	.byte %11001011
+	.byte %11111011
+	.byte %11111011
+	.byte %00011011
+	.byte %00011011
+	.byte %11111011
+	.byte %11110010
+	.byte %00000000
+	.byte %00000000
+	.byte %00000000
+	.byte %00000000
+
+logo_5
+	.byte %00000000
+	.byte %01110111
+	.byte %01000101
+	.byte %01110111
+	.byte %00010100
+	.byte %01110111
+	.byte %00000000
+	.byte %00000000
+	.byte %00000000
+	.byte %01111100
+	.byte %01100110
+	.byte %01000110
+	.byte %00001110
+	.byte %00011100
+	.byte %00011000
+	.byte %01011001
+	.byte %11011111
+	.byte %11001111
+	.byte %00000000
+	.byte %00000000
+	.byte %00000000
+	.byte %00000000
+
+	org $fffc
+	.word Start
+	.word Start
